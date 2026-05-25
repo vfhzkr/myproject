@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>我的订单 - 抢票系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }
+        .header { background: #e60012; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 22px; }
+        .nav a { color: white; text-decoration: none; margin-left: 25px; padding: 8px 16px; border-radius: 4px; }
+        .nav a:hover, .nav a.active { background: rgba(255,255,255,0.2); }
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+        .order-card { background: white; border-radius: 10px; padding: 20px 30px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
+        .order-info h3 { font-size: 18px; margin-bottom: 8px; }
+        .order-info .order-no { font-size: 12px; color: #999; }
+        .order-info .route { font-size: 16px; color: #333; margin: 8px 0; font-weight: bold; }
+        .order-info .detail { font-size: 13px; color: #888; }
+        .order-right { text-align: right; }
+        .order-right .price { font-size: 22px; color: #e60012; font-weight: bold; }
+        .order-right .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; margin-bottom: 10px; }
+        .status-bought { background: #e8f5e9; color: #2e7d32; }
+        .status-refunded { background: #fff3e0; color: #e65100; }
+        .btn-refund { padding: 8px 20px; background: #ff9800; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+        .btn-refund:hover { background: #f57c00; }
+        .btn-refund:disabled { background: #ccc; cursor: not-allowed; }
+        .empty { text-align: center; padding: 80px 20px; }
+        .empty .icon { font-size: 64px; margin-bottom: 15px; }
+        .empty p { color: #999; font-size: 16px; }
+        .empty a { color: #e60012; text-decoration: none; }
+        .loading { text-align: center; padding: 60px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚄 我的订单</h1>
+        <div class="nav">
+            <a href="/">首页</a>
+            <a href="/trains">车次查询</a>
+            <a href="/orders" class="active">我的订单</a>
+            <a href="/waitlist">我的候补</a>
+            <a href="javascript:void(0)" id="nav-user" style="color:#ffeb3b;font-weight:bold;" onclick="doLogout()">登录/注册</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="orderList">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = loadOrders;
+
+        function loadOrders() {
+            fetch('/api/orders')
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.code === -1 && res.msg === '请先登录') {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    var html = '';
+                    if (res.data && res.data.length > 0) {
+                        res.data.forEach(function(o) {
+                            var statusText = o.status === 1 ? '已购' : '已退票';
+                            var statusClass = o.status === 1 ? 'status-bought' : 'status-refunded';
+                            html += '<div class="order-card">' +
+                                '<div class="order-info">' +
+                                '<h3>' + (o.trainNo || '未知车次') + '</h3>' +
+                                '<div class="order-no">订单号：' + o.orderNo + '</div>' +
+                                '<div class="route">' + (o.departure || '') + ' → ' + (o.destination || '') + '</div>' +
+                                '<div class="detail">出发：' + (o.departureTime || '') + ' | 购票：' + o.seatCount + '张 | ' + (o.createTime || '') + '</div>' +
+                                '</div>' +
+                                '<div class="order-right">' +
+                                '<span class="status ' + statusClass + '">' + statusText + '</span>' +
+                                '<div class="price">¥' + o.totalPrice + '</div>' +
+                                (o.status === 1
+                                    ? '<button class="btn-refund" onclick="doRefund(\'' + o.orderNo + '\')">退票</button>'
+                                    : '<button class="btn-refund" disabled>已退票</button>') +
+                                '</div>' +
+                                '</div>';
+                        });
+                    } else {
+                        html = '<div class="empty">' +
+                            '<div class="icon">📭</div>' +
+                            '<p>暂无订单</p>' +
+                            '<p style="margin-top:10px;">去 <a href="/trains">车次查询</a> 购票吧</p>' +
+                            '</div>';
+                    }
+                    document.getElementById('orderList').innerHTML = html;
+                });
+        }
+
+        function doRefund(orderNo) {
+            if (!confirm('确认退票？退票后将按排队顺序通知候补用户。')) return;
+            fetch('/api/refund', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'orderNo=' + orderNo
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                alert(res.msg);
+                loadOrders();
+            });
+        }
+
+        // 检查登录状态
+        fetch('/api/user/current')
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                var navUser = document.getElementById('nav-user');
+                if (res.code === 0 && res.data) {
+                    navUser.textContent = '👤 ' + res.data.username;
+                    navUser.href = '#';
+                    navUser.setAttribute('onclick', 'doLogout()');
+                } else {
+                    navUser.textContent = '登录/注册';
+                    navUser.href = '/login';
+                    navUser.removeAttribute('onclick');
+                }
+            });
+
+        function doLogout() {
+            if (confirm('确定退出登录？')) {
+                fetch('/api/user/logout', { method: 'POST' })
+                    .then(function() { window.location.href = '/login'; });
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.myproject.mapper.TrainMapper">
+
+    <select id="findAll" resultType="com.example.myproject.entity.Train">
+        SELECT * FROM train WHERE status = 1 ORDER BY departure_time
+    </select>
+
+    <select id="findById" resultType="com.example.myproject.entity.Train">
+        SELECT * FROM train WHERE id = #{id}
+    </select>
+
+    <select id="search" resultType="com.example.myproject.entity.Train">
+        SELECT * FROM train
+        WHERE departure LIKE CONCAT('%', #{departure}, '%')
+          AND destination LIKE CONCAT('%', #{destination}, '%')
+          AND status = 1
+        ORDER BY departure_time
+    </select>
+
+    <update id="updateAvailableSeats">
+        UPDATE train SET available_seats = #{count} WHERE id = #{id}
+    </update>
+
+    <update id="increaseAvailableSeats">
+        UPDATE train SET available_seats = available_seats + #{count} WHERE id = #{id}
+    </update>
+
+    <update id="decreaseAvailableSeats">
+        UPDATE train SET available_seats = available_seats - #{count}
+        WHERE id = #{id} AND available_seats >= #{count}
+    </update>
+
+</mapper>

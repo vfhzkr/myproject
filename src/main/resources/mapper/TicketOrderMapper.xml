@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.myproject.mapper.TicketOrderMapper">
+
+    <insert id="insert" parameterType="com.example.myproject.entity.TicketOrder"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ticket_order (order_no, user_id, train_id, seat_count, total_price, status, create_time, update_time)
+        VALUES (#{orderNo}, #{userId}, #{trainId}, #{seatCount}, #{totalPrice}, #{status}, NOW(), NOW())
+    </insert>
+
+    <select id="findByOrderNo" resultType="com.example.myproject.entity.TicketOrder">
+        SELECT o.*, t.train_no, t.departure, t.destination, t.departure_time
+        FROM ticket_order o
+        LEFT JOIN train t ON o.train_id = t.id
+        WHERE o.order_no = #{orderNo}
+    </select>
+
+    <select id="findById" resultType="com.example.myproject.entity.TicketOrder">
+        SELECT o.*, t.train_no, t.departure, t.destination, t.departure_time
+        FROM ticket_order o
+        LEFT JOIN train t ON o.train_id = t.id
+        WHERE o.id = #{id}
+    </select>
+
+    <select id="findByUserId" resultType="com.example.myproject.entity.TicketOrder">
+        SELECT o.*, t.train_no, t.departure, t.destination, t.departure_time
+        FROM ticket_order o
+        LEFT JOIN train t ON o.train_id = t.id
+        WHERE o.user_id = #{userId}
+        ORDER BY o.create_time DESC
+    </select>
+
+    <select id="findByTrainId" resultType="com.example.myproject.entity.TicketOrder">
+        SELECT * FROM ticket_order WHERE train_id = #{trainId} AND status = 1
+    </select>
+
+    <select id="countByTrainIdAndStatus" resultType="int">
+        SELECT COUNT(*) FROM ticket_order WHERE train_id = #{trainId} AND status = #{status}
+    </select>
+
+    <update id="refund">
+        UPDATE ticket_order SET status = 2, update_time = NOW()
+        WHERE order_no = #{orderNo} AND status = 1
+    </update>
+
+</mapper>

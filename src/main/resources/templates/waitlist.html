@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>我的候补 - 抢票系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }
+        .header { background: #e60012; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 22px; }
+        .nav a { color: white; text-decoration: none; margin-left: 25px; padding: 8px 16px; border-radius: 4px; }
+        .nav a:hover, .nav a.active { background: rgba(255,255,255,0.2); }
+        .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
+        .wait-card { background: white; border-radius: 10px; padding: 20px 30px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
+        .wait-info h3 { font-size: 18px; margin-bottom: 8px; }
+        .wait-info .route { font-size: 16px; color: #333; margin: 8px 0; font-weight: bold; }
+        .wait-info .detail { font-size: 13px; color: #888; }
+        .wait-right { text-align: right; }
+        .status-waiting { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; background: #fff8e1; color: #f57f17; margin-bottom: 10px; }
+        .status-done { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; background: #e8f5e9; color: #2e7d32; margin-bottom: 10px; }
+        .status-cancelled { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; background: #f5f5f5; color: #999; margin-bottom: 10px; }
+        .btn-cancel { padding: 8px 20px; border: 1px solid #ccc; background: white; border-radius: 6px; font-size: 14px; cursor: pointer; color: #666; }
+        .btn-cancel:hover { background: #f5f5f5; }
+        .btn-cancel:disabled { background: #f5f5f5; color: #ccc; cursor: not-allowed; }
+        .empty { text-align: center; padding: 80px 20px; }
+        .empty .icon { font-size: 64px; margin-bottom: 15px; }
+        .empty p { color: #999; font-size: 16px; }
+        .empty a { color: #e60012; text-decoration: none; }
+        .tip { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; color: #f57f17; font-size: 14px; }
+        .loading { text-align: center; padding: 60px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚄 我的候补</h1>
+        <div class="nav">
+            <a href="/">首页</a>
+            <a href="/trains">车次查询</a>
+            <a href="/orders">我的订单</a>
+            <a href="/waitlist" class="active">我的候补</a>
+            <a href="javascript:void(0)" id="nav-user" style="color:#ffeb3b;font-weight:bold;" onclick="doLogout()">登录/注册</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="tip">💡 候补说明：当有人退票时，系统按排队顺序自动为候补用户购票。先到先得！</div>
+        <div id="waitlistContent">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = loadWaitlist;
+
+        function loadWaitlist() {
+            fetch('/api/waitlist/my')
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.code === -1 && res.msg === '请先登录') {
+                        window.location.href = '/login';
+                        return;
+                    }
+                    var html = '';
+                    if (res.data && res.data.length > 0) {
+                        res.data.forEach(function(w) {
+                            var statusHtml = '';
+                            if (w.status === 0) {
+                                statusHtml = '<span class="status-waiting">⏳ 排队中</span>';
+                            } else if (w.status === 1) {
+                                statusHtml = '<span class="status-done">✅ 已转正</span>';
+                            } else {
+                                statusHtml = '<span class="status-cancelled">❌ 已取消</span>';
+                            }
+                            html += '<div class="wait-card">' +
+                                '<div class="wait-info">' +
+                                '<h3>' + (w.trainNo || '未知车次') + '</h3>' +
+                                '<div class="route">' + (w.departure || '') + ' → ' + (w.destination || '') + '</div>' +
+                                '<div class="detail">出发：' + (w.departureTime || '') + ' | 候补：' + w.seatCount + '张 | 提交时间：' + (w.createTime || '') + '</div>' +
+                                '</div>' +
+                                '<div class="wait-right">' +
+                                statusHtml +
+                                (w.status === 0
+                                    ? '<div><button class="btn-cancel" onclick="doCancel(' + w.id + ')">取消候补</button></div>'
+                                    : '') +
+                                '</div>' +
+                                '</div>';
+                        });
+                    } else {
+                        html = '<div class="empty">' +
+                            '<div class="icon">📋</div>' +
+                            '<p>暂无候补记录</p>' +
+                            '<p style="margin-top:10px;">去 <a href="/trains">车次查询</a> 找票少的车次试试候补吧</p>' +
+                            '</div>';
+                    }
+                    document.getElementById('waitlistContent').innerHTML = html;
+                });
+        }
+
+        function doCancel(waitlistId) {
+            if (!confirm('确认取消候补？')) return;
+            fetch('/api/waitlist/cancel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'waitlistId=' + waitlistId
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                alert(res.msg);
+                loadWaitlist();
+            });
+        }
+
+        // 检查登录状态
+        fetch('/api/user/current')
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                var navUser = document.getElementById('nav-user');
+                if (res.code === 0 && res.data) {
+                    navUser.textContent = '👤 ' + res.data.username;
+                    navUser.href = '#';
+                    navUser.setAttribute('onclick', 'doLogout()');
+                } else {
+                    navUser.textContent = '登录/注册';
+                    navUser.href = '/login';
+                    navUser.removeAttribute('onclick');
+                }
+            });
+
+        function doLogout() {
+            if (confirm('确定退出登录？')) {
+                fetch('/api/user/logout', { method: 'POST' })
+                    .then(function() { window.location.href = '/login'; });
+            }
+        }
+    </script>
+</body>
+</html>

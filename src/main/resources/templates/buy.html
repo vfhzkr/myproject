@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>在线购票 - 抢票系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }
+        .header { background: #e60012; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 22px; }
+        .nav a { color: white; text-decoration: none; margin-left: 25px; padding: 8px 16px; border-radius: 4px; }
+        .nav a:hover, .nav a.active { background: rgba(255,255,255,0.2); }
+        .container { max-width: 700px; margin: 30px auto; padding: 0 20px; }
+        .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+        .card h2 { font-size: 22px; margin-bottom: 25px; color: #333; border-bottom: 2px solid #e60012; padding-bottom: 12px; }
+        .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 15px; }
+        .info-row span:first-child { color: #888; }
+        .info-row span:last-child { font-weight: bold; color: #333; }
+        .form-group { margin-top: 25px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+        .form-group select, .form-group input { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 15px; outline: none; }
+        .form-group select:focus { border-color: #e60012; }
+        .total { font-size: 28px; color: #e60012; font-weight: bold; text-align: right; margin-top: 25px; padding-top: 15px; border-top: 2px solid #f0f0f0; }
+        .btn-group { display: flex; gap: 15px; margin-top: 25px; }
+        .btn { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 17px; cursor: pointer; font-weight: bold; transition: all 0.3s; }
+        .btn-buy { background: #e60012; color: white; }
+        .btn-buy:hover { background: #cc0000; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(230,0,18,0.3); }
+        .btn-wait { background: #ff9800; color: white; }
+        .btn-wait:hover { background: #f57c00; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255,152,0,0.3); }
+        .btn-back { background: #666; color: white; }
+        .btn-back:hover { background: #555; }
+        .msg { padding: 12px 16px; border-radius: 6px; margin-top: 15px; display: none; font-size: 15px; }
+        .msg.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; display: block; }
+        .msg.error { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; display: block; }
+        .loading { text-align: center; padding: 60px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚄 在线购票</h1>
+        <div class="nav">
+            <a href="/">首页</a>
+            <a href="/trains">车次查询</a>
+            <a href="/orders">我的订单</a>
+            <a href="/waitlist">我的候补</a>
+            <a href="javascript:void(0)" id="nav-user" style="color:#ffeb3b;font-weight:bold;" onclick="doLogout()">登录/注册</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="content">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        var params = new URLSearchParams(window.location.search);
+        var trainId = params.get('trainId');
+        var trainData = null;
+
+        if (!trainId) {
+            document.getElementById('content').innerHTML = '<div class="card"><h2>请先选择车次</h2><p style="margin:20px 0;color:#888;">需要从车次查询页面进入购票</p><a href="/trains" class="btn btn-back" style="display:inline-block;text-decoration:none;">返回车次查询</a></div>';
+        } else {
+            fetch('/api/train/' + trainId)
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.code === 0) {
+                        trainData = res.data;
+                        renderPage(res.data);
+                    } else {
+                        document.getElementById('content').innerHTML = '<div class="card"><h2>错误</h2><p>' + res.msg + '</p></div>';
+                    }
+                });
+        }
+
+        function renderPage(train) {
+            var html = '<div class="card">' +
+                '<h2>确认订单</h2>' +
+                '<div class="info-row"><span>车次</span><span style="color:#e60012;">' + train.trainNo + '</span></div>' +
+                '<div class="info-row"><span>出发站</span><span>' + train.departure + '</span></div>' +
+                '<div class="info-row"><span>到达站</span><span>' + train.destination + '</span></div>' +
+                '<div class="info-row"><span>出发时间</span><span>' + (train.departureTime || '') + '</span></div>' +
+                '<div class="info-row"><span>到达时间</span><span>' + (train.arrivalTime || '') + '</span></div>' +
+                '<div class="info-row"><span>余票</span><span style="color:#e60012;">' + train.availableSeats + ' 张</span></div>' +
+                '<div class="info-row"><span>单价</span><span>¥' + train.price + '</span></div>' +
+                '<div class="form-group">' +
+                '<label>购买数量</label>' +
+                '<select id="count" onchange="updateTotal()">';
+            for (var i = 1; i <= Math.min(train.availableSeats, 5); i++) {
+                html += '<option value="' + i + '">' + i + ' 张</option>';
+            }
+            html += '</select></div>' +
+                '<div class="total">合计：<span id="totalPrice">¥' + train.price + '</span></div>' +
+                '<div id="msg" class="msg"></div>' +
+                '<div class="btn-group">' +
+                '<button class="btn btn-back" onclick="history.back()">返回</button>' +
+                '<button class="btn btn-wait" onclick="doWaitlist()">候补</button>' +
+                '<button class="btn btn-buy" onclick="doBuy()">立即购买</button>' +
+                '</div></div>';
+            document.getElementById('content').innerHTML = html;
+        }
+
+        function updateTotal() {
+            if (!trainData) return;
+            var count = parseInt(document.getElementById('count').value);
+            var total = count * trainData.price;
+            document.getElementById('totalPrice').textContent = '¥' + total.toFixed(2);
+        }
+
+        function doBuy() {
+            var count = document.getElementById('count').value;
+            var btn = document.querySelector('.btn-buy');
+            btn.disabled = true;
+            btn.textContent = '抢票中...';
+
+            fetch('/api/buy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'trainId=' + trainId + '&count=' + count
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.code === -1 && res.msg === '请先登录') {
+                    window.location.href = '/login';
+                    return;
+                }
+                var msgEl = document.getElementById('msg');
+                if (res.code === 0) {
+                    msgEl.className = 'msg success';
+                } else {
+                    msgEl.className = 'msg error';
+                }
+                msgEl.textContent = res.msg;
+                btn.disabled = false;
+                btn.textContent = '立即购买';
+
+                if (res.code === 0) {
+                    setTimeout(function() { window.location.href = '/orders'; }, 1500);
+                }
+            });
+        }
+
+        function doWaitlist() {
+            var count = document.getElementById('count').value;
+            if (!confirm('确认加入候补队列？有票时将按排队顺序自动购票。')) return;
+
+            fetch('/api/waitlist', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'trainId=' + trainId + '&count=' + count
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.code === -1 && res.msg === '请先登录') {
+                    window.location.href = '/login';
+                    return;
+                }
+                var msgEl = document.getElementById('msg');
+                if (res.code === 0) {
+                    msgEl.className = 'msg success';
+                    setTimeout(function() { window.location.href = '/waitlist'; }, 1500);
+                } else {
+                    msgEl.className = 'msg error';
+                }
+                msgEl.textContent = res.msg;
+            });
+        }
+
+        // 检查登录状态
+        fetch('/api/user/current')
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                var navUser = document.getElementById('nav-user');
+                if (res.code === 0 && res.data) {
+                    navUser.textContent = '👤 ' + res.data.username;
+                    navUser.href = '#';
+                    navUser.setAttribute('onclick', 'doLogout()');
+                } else {
+                    navUser.textContent = '登录/注册';
+                    navUser.href = '/login';
+                    navUser.removeAttribute('onclick');
+                }
+            });
+
+        function doLogout() {
+            if (confirm('确定退出登录？')) {
+                fetch('/api/user/logout', { method: 'POST' })
+                    .then(function() { window.location.href = '/login'; });
+            }
+        }
+    </script>
+</body>
+</html>

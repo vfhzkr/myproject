@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.myproject.mapper.WaitlistMapper">
+
+    <insert id="insert" parameterType="com.example.myproject.entity.Waitlist"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO waitlist (user_id, train_id, seat_count, create_time, status)
+        VALUES (#{userId}, #{trainId}, #{seatCount}, NOW(), 0)
+    </insert>
+
+    <select id="findByUserId" resultType="com.example.myproject.entity.Waitlist">
+        SELECT w.*, t.train_no, t.departure, t.destination, t.departure_time
+        FROM waitlist w
+        LEFT JOIN train t ON w.train_id = t.id
+        WHERE w.user_id = #{userId}
+        ORDER BY w.create_time DESC
+    </select>
+
+    <select id="findByTrainIdOrderByTime" resultType="com.example.myproject.entity.Waitlist">
+        SELECT * FROM waitlist
+        WHERE train_id = #{trainId} AND status = 0
+        ORDER BY create_time ASC
+    </select>
+
+    <select id="findById" resultType="com.example.myproject.entity.Waitlist">
+        SELECT w.*, t.train_no, t.departure, t.destination, t.departure_time
+        FROM waitlist w
+        LEFT JOIN train t ON w.train_id = t.id
+        WHERE w.id = #{id}
+    </select>
+
+    <update id="updateStatus">
+        UPDATE waitlist SET status = #{status} WHERE id = #{id}
+    </update>
+
+    <update id="cancel">
+        UPDATE waitlist SET status = 2 WHERE id = #{id} AND status = 0
+    </update>
+
+</mapper>

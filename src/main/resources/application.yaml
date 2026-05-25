@@ -1,3 +1,31 @@
 spring:
   application:
     name: myproject
+  datasource:
+    url: jdbc:mysql://localhost:3306/ticket_system?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password: 10111011
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: 192.168.176.128
+      port: 6379
+      lettuce:
+        pool:
+          max-active: 50
+          max-idle: 20
+          min-idle: 10
+      password: 10111011
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    cache: false
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.example.myproject.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+server:
+  port: 8080
