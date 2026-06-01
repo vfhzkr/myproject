@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class TrainService {
@@ -22,16 +24,20 @@ public class TrainService {
     private RedisTemplate<String, Object> redisTemplate;
 
     /**
-     * 启动时将所有车次余票加载到Redis
+     * 启动时将所有车次余票加载到Redis（连接失败不阻塞启动）
      */
     @PostConstruct
     public void initRedisCache() {
-        List<Train> trains = trainMapper.findAll();
-        for (Train train : trains) {
-            String key = SEATS_PREFIX + train.getId();
-            redisTemplate.opsForValue().set(key, train.getAvailableSeats(), 24, TimeUnit.HOURS);
+        try {
+            List<Train> trains = trainMapper.findAll();
+            for (Train train : trains) {
+                String key = SEATS_PREFIX + train.getId();
+                redisTemplate.opsForValue().set(key, train.getAvailableSeats(), 24, TimeUnit.HOURS);
+            }
+            System.out.println("Redis缓存初始化完成，共加载 " + trains.size() + " 个车次");
+        } catch (Exception e) {
+            System.err.println("Redis缓存初始化失败（应用将继续运行，降级为直连MySQL）: " + e.getMessage());
         }
-        System.out.println("Redis缓存初始化完成，共加载 " + trains.size() + " 个车次");
     }
 
     /**
@@ -78,19 +84,19 @@ public class TrainService {
 
     /**
      * 增加余票（退票时调用）
+     * 只更新 MySQL，然后删除 Redis 缓存，事务回滚时不会造成不一致
      */
     public void increaseSeats(Long trainId, int count) {
         trainMapper.increaseAvailableSeats(trainId, count);
-        redisTemplate.opsForValue().increment(SEATS_PREFIX + trainId, count);
+        // 事务提交后删除缓存，下次读取时从 MySQL 回源
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    redisTemplate.delete(SEATS_PREFIX + trainId);
+                }
+            }
+        );
     }
 
-    /**
-     * 刷新Redis缓存
-     */
-    public void refreshCache(Long trainId) {
-        Train train = trainMapper.findById(trainId);
-        if (train != null) {
-            redisTemplate.opsForValue().set(SEATS_PREFIX + trainId, train.getAvailableSeats(), 24, TimeUnit.HOURS);
-        }
-    }
 }

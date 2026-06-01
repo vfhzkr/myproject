@@ -6,18 +6,24 @@ import com.example.myproject.entity.Waitlist;
 import com.example.myproject.mapper.TicketOrderMapper;
 import com.example.myproject.mapper.TrainMapper;
 import com.example.myproject.mapper.WaitlistMapper;
+import jakarta.annotation.PreDestroy;
 import org.redisson.api.RBucket;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -41,22 +47,56 @@ public class TicketService {
     @Autowired
     private RedissonClient redissonClient;
 
+    // 自注入，使 @Transactional 在 processWaitlist 调用时通过代理生效
+    @Autowired
+    private TicketService self;
+
+    /**
+     * 候补处理线程池：异步处理退票后的候补转正，避免阻塞退票接口响应
+     * core=2, max=4, 有界队列(500), CallerRunsPolicy 拒绝时由退票线程兜底
+     */
+    private final ExecutorService waitlistExecutor = new ThreadPoolExecutor(
+            2,
+            4,
+            60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(500),
+            r -> {
+                Thread t = new Thread(r, "waitlist-" + r.hashCode());
+                t.setDaemon(true);
+                return t;
+            },
+            new ThreadPoolExecutor.CallerRunsPolicy()
+    );
+
+    @PreDestroy
+    public void shutdown() {
+        waitlistExecutor.shutdown();
+        try {
+            if (!waitlistExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
+                waitlistExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            waitlistExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
     /**
      * 购票核心逻辑：
-     * Redisson 公平锁保证排队顺序 + RBucket 直接读写
-     * 锁内 check-and-set，代码清晰无 Lua 依赖
+     * Redisson 公平锁 + @Transactional 保证数据一致性
+     * MySQL 作为数据权威源，Redis 仅作为缓存，事务提交后才写入
      *
      * @param userId  用户ID
      * @param trainId 车次ID
      * @param count   购买数量
      * @return 结果消息
      */
+    @Transactional
     public String buyTicket(Long userId, Long trainId, int count) {
-        // 1. Redisson 公平锁：FIFO 先进先出，避免惊群效应
+        // FairLock：FIFO 排队，避免惊群效应
         RLock lock = redissonClient.getFairLock(LOCK_PREFIX + trainId);
         try {
-            // tryLock：最多等 5 秒，锁持有 10 秒自动释放（避免死锁）
-            if (!lock.tryLock(5, 10, TimeUnit.SECONDS)) {
+            if (!lock.tryLock(5, -1, TimeUnit.SECONDS)) {
                 return "当前抢票人数过多，请稍后再试";
             }
         } catch (InterruptedException e) {
@@ -65,38 +105,24 @@ public class TicketService {
         }
 
         try {
-            // 2. 检查车次信息
+            // 以 MySQL 为准读取余票（锁+事务保护，值始终准确）
             Train train = trainMapper.findById(trainId);
             if (train == null || train.getStatus() != 1) {
                 return "车次不存在或已停售";
             }
 
-            // 3. 从 Redis 读取余票并原子性扣减（锁内操作，线程安全）
-            RBucket<Integer> bucket = redissonClient.getBucket(SEATS_PREFIX + trainId);
-            Integer available = bucket.get();
-
-            if (available == null) {
-                // 缓存失效，从 MySQL 回源
-                trainService.refreshCache(trainId);
-                available = train.getAvailableSeats();
-            }
-
+            int available = train.getAvailableSeats();
             if (available < count) {
                 return "余票不足，当前仅剩 " + available + " 张";
             }
 
-            // 扣减 Redis 余票
-            bucket.set(available - count);
-
-            // 4. 同步更新 MySQL
+            // 扣减 MySQL（带条件 WHERE available_seats >= count）
             int updated = trainMapper.decreaseAvailableSeats(trainId, count);
             if (updated == 0) {
-                // MySQL 更新失败，回滚 Redis
-                bucket.set(available);
                 return "余票不足，购票失败";
             }
 
-            // 5. 创建订单
+            // 创建订单（与扣库存在同一事务，任一失败整体回滚）
             TicketOrder order = new TicketOrder();
             order.setOrderNo(generateOrderNo());
             order.setUserId(userId);
@@ -106,10 +132,21 @@ public class TicketService {
             order.setStatus(1);
             orderMapper.insert(order);
 
+            // 事务提交后更新 Redis 缓存（避免事务回滚导致 Redis 与 MySQL 不一致）
+            final int finalAvailable = available;
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        RBucket<Integer> bucket = redissonClient.getBucket(SEATS_PREFIX + trainId);
+                        bucket.set(finalAvailable - count);
+                    }
+                }
+            );
+
             return "购票成功！订单号：" + order.getOrderNo();
 
         } finally {
-            // 确保锁被释放（Redisson 看门狗也会兜底）
             if (lock.isHeldByCurrentThread()) {
                 lock.unlock();
             }
@@ -137,8 +174,16 @@ public class TicketService {
         // 恢复余票（Redis + MySQL）
         trainService.increaseSeats(order.getTrainId(), order.getSeatCount());
 
-        // 处理候补队列
-        processWaitlist(order.getTrainId());
+        // 异步处理候补队列（事务提交后执行，避免阻塞退票响应）
+        final Long refundTrainId = order.getTrainId();
+        TransactionSynchronizationManager.registerSynchronization(
+            new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    waitlistExecutor.submit(() -> processWaitlist(refundTrainId));
+                }
+            }
+        );
 
         return "退票成功";
     }
@@ -149,7 +194,8 @@ public class TicketService {
     private void processWaitlist(Long trainId) {
         List<Waitlist> waitlists = waitlistMapper.findByTrainIdOrderByTime(trainId);
         for (Waitlist wl : waitlists) {
-            String result = buyTicket(wl.getUserId(), trainId, wl.getSeatCount());
+            // 通过 self 调用代理方法，@Transactional 生效
+            String result = self.buyTicket(wl.getUserId(), trainId, wl.getSeatCount());
             if (result.startsWith("购票成功")) {
                 waitlistMapper.updateStatus(wl.getId(), 1);
             } else {

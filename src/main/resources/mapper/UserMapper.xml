@@ -25,4 +25,8 @@
         SELECT * FROM `user` WHERE email = #{email}
     </select>
 
+    <update id="updatePassword">
+        UPDATE `user` SET password = #{password} WHERE id = #{id}
+    </update>
+
 </mapper>

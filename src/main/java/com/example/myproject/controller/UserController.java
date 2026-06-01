@@ -1,5 +1,6 @@
 package com.example.myproject.controller;
 
+import com.example.myproject.common.Result;
 import com.example.myproject.entity.User;
 import com.example.myproject.service.UserService;
 import jakarta.servlet.http.HttpSession;
@@ -22,70 +23,56 @@ public class UserController {
      * 注册
      */
     @PostMapping("/register")
-    public Map<String, Object> register(@RequestParam String username,
-                                         @RequestParam String password,
-                                         @RequestParam(required = false) String phone,
-                                         @RequestParam(required = false) String email) {
+    public Result<?> register(@RequestParam String username,
+                              @RequestParam String password,
+                              @RequestParam(required = false) String phone,
+                              @RequestParam(required = false) String email) {
         String msg = userService.register(username, password, phone, email);
-        Map<String, Object> result = new HashMap<>();
-        result.put("code", msg.equals("注册成功") ? 0 : -1);
-        result.put("msg", msg);
-        return result;
+        if (msg.equals("注册成功")) {
+            return Result.ok();
+        }
+        return Result.fail(msg);
     }
 
     /**
      * 登录
      */
     @PostMapping("/login")
-    public Map<String, Object> login(@RequestParam String username,
-                                      @RequestParam String password,
-                                      HttpSession session) {
+    public Result<?> login(@RequestParam String username,
+                           @RequestParam String password,
+                           HttpSession session) {
         User user = userService.login(username, password);
-        Map<String, Object> result = new HashMap<>();
         if (user != null) {
             session.setAttribute(SESSION_KEY, user);
-            result.put("code", 0);
-            result.put("msg", "登录成功");
             Map<String, Object> data = new HashMap<>();
             data.put("username", user.getUsername());
-            result.put("data", data);
-        } else {
-            result.put("code", -1);
-            result.put("msg", "用户名或密码错误");
+            return Result.ok(data);
         }
-        return result;
+        return Result.fail("用户名或密码错误");
     }
 
     /**
      * 获取当前登录用户
      */
     @GetMapping("/current")
-    public Map<String, Object> current(HttpSession session) {
+    public Result<?> current(HttpSession session) {
         User user = (User) session.getAttribute(SESSION_KEY);
-        Map<String, Object> result = new HashMap<>();
         if (user != null) {
-            result.put("code", 0);
             Map<String, Object> data = new HashMap<>();
             data.put("id", user.getId());
             data.put("username", user.getUsername());
-            result.put("data", data);
-        } else {
-            result.put("code", -1);
-            result.put("msg", "未登录");
+            return Result.ok(data);
         }
-        return result;
+        return Result.fail("未登录");
     }
 
     /**
      * 退出登录
      */
     @PostMapping("/logout")
-    public Map<String, Object> logout(HttpSession session) {
+    public Result<?> logout(HttpSession session) {
         session.removeAttribute(SESSION_KEY);
-        Map<String, Object> result = new HashMap<>();
-        result.put("code", 0);
-        result.put("msg", "已退出");
-        return result;
+        return Result.ok();
     }
 
     /**
