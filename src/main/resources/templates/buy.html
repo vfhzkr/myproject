@@ -5,30 +5,30 @@
     <title>在线购票 - 抢票系统</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }
-        .header { background: #e60012; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f8fafc; min-height: 100vh; }
+        .header { background: #2563eb; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
         .header h1 { font-size: 22px; }
         .nav a { color: white; text-decoration: none; margin-left: 25px; padding: 8px 16px; border-radius: 4px; }
         .nav a:hover, .nav a.active { background: rgba(255,255,255,0.2); }
         .container { max-width: 700px; margin: 30px auto; padding: 0 20px; }
-        .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-        .card h2 { font-size: 22px; margin-bottom: 25px; color: #333; border-bottom: 2px solid #e60012; padding-bottom: 12px; }
+        .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 12px rgba(37,99,235,0.08); }
+        .card h2 { font-size: 22px; margin-bottom: 25px; color: #1e3a5f; border-bottom: 2px solid #2563eb; padding-bottom: 12px; }
         .info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f0f0f0; font-size: 15px; }
         .info-row span:first-child { color: #888; }
         .info-row span:last-child { font-weight: bold; color: #333; }
         .form-group { margin-top: 25px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
         .form-group select, .form-group input { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 15px; outline: none; }
-        .form-group select:focus { border-color: #e60012; }
-        .total { font-size: 28px; color: #e60012; font-weight: bold; text-align: right; margin-top: 25px; padding-top: 15px; border-top: 2px solid #f0f0f0; }
+        .form-group select:focus { border-color: #3b82f6; }
+        .total { font-size: 28px; color: #2563eb; font-weight: bold; text-align: right; margin-top: 25px; padding-top: 15px; border-top: 2px solid #f0f0f0; }
         .btn-group { display: flex; gap: 15px; margin-top: 25px; }
         .btn { flex: 1; padding: 14px; border: none; border-radius: 8px; font-size: 17px; cursor: pointer; font-weight: bold; transition: all 0.3s; }
-        .btn-buy { background: #e60012; color: white; }
-        .btn-buy:hover { background: #cc0000; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(230,0,18,0.3); }
-        .btn-wait { background: #ff9800; color: white; }
-        .btn-wait:hover { background: #f57c00; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(255,152,0,0.3); }
-        .btn-back { background: #666; color: white; }
-        .btn-back:hover { background: #555; }
+        .btn-buy { background: #2563eb; color: white; }
+        .btn-buy:hover { background: #1d4ed8; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+        .btn-wait { background: #64748b; color: white; }
+        .btn-wait:hover { background: #475569; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(100,116,139,0.3); }
+        .btn-back { background: #94a3b8; color: white; }
+        .btn-back:hover { background: #64748b; }
         .msg { padding: 12px 16px; border-radius: 6px; margin-top: 15px; display: none; font-size: 15px; }
         .msg.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; display: block; }
         .msg.error { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; display: block; }
@@ -43,7 +43,7 @@
             <a href="/trains">车次查询</a>
             <a href="/orders">我的订单</a>
             <a href="/waitlist">我的候补</a>
-            <a href="javascript:void(0)" id="nav-user" style="color:#ffeb3b;font-weight:bold;" onclick="doLogout()">登录/注册</a>
+            <a href="javascript:void(0)" id="nav-user" style="color:#bfdbfe;font-weight:bold;" onclick="doLogout()">登录/注册</a>
         </div>
     </div>
 
@@ -76,12 +76,12 @@
         function renderPage(train) {
             var html = '<div class="card">' +
                 '<h2>确认订单</h2>' +
-                '<div class="info-row"><span>车次</span><span style="color:#e60012;">' + train.trainNo + '</span></div>' +
+                '<div class="info-row"><span>车次</span><span style="color:#2563eb;">' + train.trainNo + '</span></div>' +
                 '<div class="info-row"><span>出发站</span><span>' + train.departure + '</span></div>' +
                 '<div class="info-row"><span>到达站</span><span>' + train.destination + '</span></div>' +
                 '<div class="info-row"><span>出发时间</span><span>' + (train.departureTime || '') + '</span></div>' +
                 '<div class="info-row"><span>到达时间</span><span>' + (train.arrivalTime || '') + '</span></div>' +
-                '<div class="info-row"><span>余票</span><span style="color:#e60012;">' + train.availableSeats + ' 张</span></div>' +
+                '<div class="info-row"><span>余票</span><span style="color:#2563eb;">' + train.availableSeats + ' 张</span></div>' +
                 '<div class="info-row"><span>单价</span><span>¥' + train.price + '</span></div>' +
                 '<div class="form-group">' +
                 '<label>购买数量</label>' +

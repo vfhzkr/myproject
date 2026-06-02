@@ -5,28 +5,28 @@
     <title>车次查询 - 抢票系统</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }
-        .header { background: #e60012; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f8fafc; min-height: 100vh; }
+        .header { background: #2563eb; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
         .header h1 { font-size: 22px; }
         .nav a { color: white; text-decoration: none; margin-left: 25px; padding: 8px 16px; border-radius: 4px; }
         .nav a:hover, .nav a.active { background: rgba(255,255,255,0.2); }
         .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
-        .search-box { background: white; padding: 20px 30px; border-radius: 10px; margin-bottom: 25px; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .search-box { background: white; padding: 20px 30px; border-radius: 10px; margin-bottom: 25px; display: flex; gap: 15px; align-items: center; box-shadow: 0 2px 8px rgba(37,99,235,0.06); }
         .search-box input { flex: 1; padding: 12px 16px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 15px; outline: none; transition: border-color 0.3s; }
-        .search-box input:focus { border-color: #e60012; }
-        .search-box button { padding: 12px 30px; background: #e60012; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; transition: background 0.3s; }
-        .search-box button:hover { background: #cc0000; }
-        .train-card { background: white; border-radius: 10px; padding: 20px 30px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: box-shadow 0.3s; }
-        .train-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+        .search-box input:focus { border-color: #3b82f6; }
+        .search-box button { padding: 12px 30px; background: #2563eb; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; transition: background 0.3s; }
+        .search-box button:hover { background: #1d4ed8; }
+        .train-card { background: white; border-radius: 10px; padding: 20px 30px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(37,99,235,0.06); transition: box-shadow 0.3s; }
+        .train-card:hover { box-shadow: 0 4px 16px rgba(37,99,235,0.1); }
         .train-info h3 { font-size: 20px; margin-bottom: 8px; }
-        .train-info .train-no { color: #e60012; font-weight: bold; margin-right: 10px; }
+        .train-info .train-no { color: #2563eb; font-weight: bold; margin-right: 10px; }
         .train-info .route { color: #555; font-size: 15px; }
         .train-info .time { color: #888; font-size: 13px; margin-top: 4px; }
         .train-right { text-align: right; }
-        .train-right .price { font-size: 24px; color: #e60012; font-weight: bold; }
+        .train-right .price { font-size: 24px; color: #2563eb; font-weight: bold; }
         .train-right .seats { color: #666; font-size: 14px; margin-bottom: 10px; }
-        .train-right .btn { display: inline-block; padding: 10px 24px; background: #e60012; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; transition: background 0.3s; }
-        .train-right .btn:hover { background: #cc0000; }
+        .train-right .btn { display: inline-block; padding: 10px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; cursor: pointer; border: none; transition: background 0.3s; }
+        .train-right .btn:hover { background: #1d4ed8; }
         .train-right .btn.disabled { background: #ccc; cursor: not-allowed; }
         .empty { text-align: center; padding: 60px; color: #999; font-size: 16px; }
         .loading { text-align: center; padding: 60px; }
@@ -40,7 +40,7 @@
             <a href="/trains" class="active">车次查询</a>
             <a href="/orders">我的订单</a>
             <a href="/waitlist">我的候补</a>
-            <a href="javascript:void(0)" id="nav-user" style="color:#ffeb3b;font-weight:bold;" onclick="doLogout()">登录/注册</a>
+            <a href="javascript:void(0)" id="nav-user" style="color:#bfdbfe;font-weight:bold;" onclick="doLogout()">登录/注册</a>
         </div>
     </div>
 

@@ -5,29 +5,29 @@
     <title>我的订单 - 抢票系统</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f5f6fa; min-height: 100vh; }
-        .header { background: #e60012; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
+        body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f8fafc; min-height: 100vh; }
+        .header { background: #2563eb; color: white; padding: 15px 40px; display: flex; justify-content: space-between; align-items: center; }
         .header h1 { font-size: 22px; }
         .nav a { color: white; text-decoration: none; margin-left: 25px; padding: 8px 16px; border-radius: 4px; }
         .nav a:hover, .nav a.active { background: rgba(255,255,255,0.2); }
         .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
-        .order-card { background: white; border-radius: 10px; padding: 20px 30px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
+        .order-card { background: white; border-radius: 10px; padding: 20px 30px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(37,99,235,0.06); display: flex; justify-content: space-between; align-items: center; }
         .order-info h3 { font-size: 18px; margin-bottom: 8px; }
         .order-info .order-no { font-size: 12px; color: #999; }
         .order-info .route { font-size: 16px; color: #333; margin: 8px 0; font-weight: bold; }
         .order-info .detail { font-size: 13px; color: #888; }
         .order-right { text-align: right; }
-        .order-right .price { font-size: 22px; color: #e60012; font-weight: bold; }
+        .order-right .price { font-size: 22px; color: #2563eb; font-weight: bold; }
         .order-right .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; margin-bottom: 10px; }
         .status-bought { background: #e8f5e9; color: #2e7d32; }
         .status-refunded { background: #fff3e0; color: #e65100; }
-        .btn-refund { padding: 8px 20px; background: #ff9800; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
-        .btn-refund:hover { background: #f57c00; }
+        .btn-refund { padding: 8px 20px; background: #f59e0b; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+        .btn-refund:hover { background: #d97706; }
         .btn-refund:disabled { background: #ccc; cursor: not-allowed; }
         .empty { text-align: center; padding: 80px 20px; }
         .empty .icon { font-size: 64px; margin-bottom: 15px; }
         .empty p { color: #999; font-size: 16px; }
-        .empty a { color: #e60012; text-decoration: none; }
+        .empty a { color: #2563eb; text-decoration: none; }
         .loading { text-align: center; padding: 60px; }
     </style>
 </head>
@@ -39,7 +39,7 @@
             <a href="/trains">车次查询</a>
             <a href="/orders" class="active">我的订单</a>
             <a href="/waitlist">我的候补</a>
-            <a href="javascript:void(0)" id="nav-user" style="color:#ffeb3b;font-weight:bold;" onclick="doLogout()">登录/注册</a>
+            <a href="javascript:void(0)" id="nav-user" style="color:#bfdbfe;font-weight:bold;" onclick="doLogout()">登录/注册</a>
         </div>
     </div>
 
