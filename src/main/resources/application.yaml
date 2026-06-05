@@ -16,6 +16,20 @@ spring:
           max-idle: 20
           min-idle: 10
       password: 10111011
+  rabbitmq:
+    host: 192.168.176.128
+    port: 5672
+    virtual-host: ticket_vhost
+    username: admin
+    password: 10111011
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2000
+        prefetch: 1
+
   thymeleaf:
     prefix: classpath:/templates/
     suffix: .html

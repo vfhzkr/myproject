@@ -20,4 +20,6 @@ public interface WaitlistMapper {
     Waitlist findById(@Param("id") Long id);
 
     int cancel(@Param("id") Long id);
+
+    int countPendingByUserAndTrain(@Param("userId") Long userId, @Param("trainId") Long trainId);
 }

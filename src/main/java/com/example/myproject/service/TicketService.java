@@ -1,5 +1,6 @@
 package com.example.myproject.service;
 
+import com.example.myproject.config.RabbitConfig;
 import com.example.myproject.entity.TicketOrder;
 import com.example.myproject.entity.Train;
 import com.example.myproject.entity.Waitlist;
@@ -7,22 +8,17 @@ import com.example.myproject.mapper.TicketOrderMapper;
 import com.example.myproject.mapper.TrainMapper;
 import com.example.myproject.mapper.WaitlistMapper;
 import com.example.myproject.service.TicketPurchaseService;
-import jakarta.annotation.PreDestroy;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class TicketService {
@@ -42,35 +38,8 @@ public class TicketService {
     @Autowired
     private TicketPurchaseService ticketPurchaseService;
 
-    /**
-     * 候补处理线程池：异步处理退票后的候补转正，避免阻塞退票接口响应
-     * core=2, max=4, 有界队列(500), CallerRunsPolicy 拒绝时由退票线程兜底
-     */
-    private final ExecutorService waitlistExecutor = new ThreadPoolExecutor(
-            2,
-            4,
-            60L, TimeUnit.SECONDS,
-            new LinkedBlockingQueue<>(500),
-            r -> {
-                Thread t = new Thread(r, "waitlist-" + r.hashCode());
-                t.setDaemon(true);
-                return t;
-            },
-            new ThreadPoolExecutor.CallerRunsPolicy()
-    );
-
-    @PreDestroy
-    public void shutdown() {
-        waitlistExecutor.shutdown();
-        try {
-            if (!waitlistExecutor.awaitTermination(30, TimeUnit.SECONDS)) {
-                waitlistExecutor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            waitlistExecutor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     /**
      * 购票核心逻辑：
@@ -108,13 +77,17 @@ public class TicketService {
         // 恢复余票（Redis + MySQL）
         trainService.increaseSeats(order.getTrainId(), order.getSeatCount());
 
-        // 异步处理候补队列（事务提交后执行，避免阻塞退票响应）
+        // RabbitMQ 异步处理候补队列（事务提交后发送消息，更可靠）
         final Long refundTrainId = order.getTrainId();
         TransactionSynchronizationManager.registerSynchronization(
             new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    waitlistExecutor.submit(() -> processWaitlist(refundTrainId));
+                    rabbitTemplate.convertAndSend(
+                        RabbitConfig.WAITLIST_EXCHANGE,
+                        RabbitConfig.WAITLIST_ROUTING_KEY,
+                        refundTrainId
+                    );
                 }
             }
         );
@@ -122,23 +95,20 @@ public class TicketService {
         return "退票成功";
     }
 
-    /**
-     * 处理候补队列：按提交时间顺序自动转正
-     */
-    private void processWaitlist(Long trainId) {
-        List<Waitlist> waitlists = waitlistMapper.findByTrainIdOrderByTime(trainId);
-        for (Waitlist wl : waitlists) {
-            String result = ticketPurchaseService.buyTicket(wl.getUserId(), trainId, wl.getSeatCount());
-            if (result.startsWith("购票成功")) {
-                waitlistMapper.updateStatus(wl.getId(), 1);
-            } else {
-                break;
-            }
-        }
-    }
-
     @Transactional
     public String addWaitlist(Long userId, Long trainId, int count) {
+        // 1. 先尝试直接购买（有票就直接兑现，不用排队）
+        String buyResult = ticketPurchaseService.buyTicket(userId, trainId, count);
+        if (buyResult.startsWith("购票成功")) {
+            return buyResult + "（已自动兑现）";
+        }
+
+        // 2. 检查是否已在候补队列中（应用层防重复）
+        if (waitlistMapper.countPendingByUserAndTrain(userId, trainId) > 0) {
+            return "您已在候补队列中，请勿重复提交";
+        }
+
+        // 3. 买不到才进入候补排队
         Train train = trainMapper.findById(trainId);
         if (train == null) {
             return "车次不存在";
@@ -149,7 +119,12 @@ public class TicketService {
         wl.setTrainId(trainId);
         wl.setSeatCount(count);
         wl.setStatus(0);
-        waitlistMapper.insert(wl);
+        try {
+            waitlistMapper.insert(wl);
+        } catch (Exception e) {
+            // 数据库唯一约束兜底：极低概率的并发重复插入
+            return "您已在候补队列中，请勿重复提交";
+        }
 
         return "候补成功，排队中...";
     }

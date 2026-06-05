@@ -30,6 +30,11 @@
         WHERE w.id = #{id}
     </select>
 
+    <select id="countPendingByUserAndTrain" resultType="int">
+        SELECT COUNT(*) FROM waitlist
+        WHERE user_id = #{userId} AND train_id = #{trainId} AND status = 0
+    </select>
+
     <update id="updateStatus">
         UPDATE waitlist SET status = #{status} WHERE id = #{id}
     </update>

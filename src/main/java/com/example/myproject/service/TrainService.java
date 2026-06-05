@@ -84,16 +84,24 @@ public class TrainService {
 
     /**
      * 增加余票（退票时调用）
-     * 只更新 MySQL，然后删除 Redis 缓存，事务回滚时不会造成不一致
+     * 只更新 MySQL，事务提交后：删除旧缓存 → 主动从 MySQL 回源写入 Redis
+     * 相比纯 delete 策略，可避免退票后大量查询穿透到 MySQL
      */
     public void increaseSeats(Long trainId, int count) {
         trainMapper.increaseAvailableSeats(trainId, count);
-        // 事务提交后删除缓存，下次读取时从 MySQL 回源
+        // 事务提交后：删除旧缓存 + 主动回源写入
         TransactionSynchronizationManager.registerSynchronization(
             new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    redisTemplate.delete(SEATS_PREFIX + trainId);
+                    String key = SEATS_PREFIX + trainId;
+                    // 1. 先删除旧缓存（防止并发读拿到旧值）
+                    redisTemplate.delete(key);
+                    // 2. 主动从 MySQL 读取最新余票写入 Redis（避免缓存穿透）
+                    Train train = trainMapper.findById(trainId);
+                    if (train != null) {
+                        redisTemplate.opsForValue().set(key, train.getAvailableSeats(), 1, TimeUnit.HOURS);
+                    }
                 }
             }
         );

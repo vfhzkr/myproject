@@ -36,7 +36,15 @@ public class TicketPurchaseService {
 
     @Transactional
     public String buyTicket(Long userId, Long trainId, int count) {
-        // FairLock：FIFO 排队，避免惊群效应
+        // ========== Redis 预检（无锁，快速拒绝） ==========
+        // 利用缓存余票提前拦截，减少不必要的锁竞争 + MySQL 读压力
+        RBucket<Integer> bucket = redissonClient.getBucket(SEATS_PREFIX + trainId);
+        Integer cachedSeats = bucket.get();
+        if (cachedSeats != null && cachedSeats < count) {
+            return "余票不足，当前仅剩 " + cachedSeats + " 张";
+        }
+
+        // ========== FairLock：FIFO 排队，避免惊群效应 ==========
         RLock lock = redissonClient.getFairLock(LOCK_PREFIX + trainId);
         try {
             if (!lock.tryLock(5, -1, TimeUnit.SECONDS)) {
@@ -82,7 +90,7 @@ public class TicketPurchaseService {
                     @Override
                     public void afterCommit() {
                         RBucket<Integer> bucket = redissonClient.getBucket(SEATS_PREFIX + trainId);
-                        bucket.set(finalAvailable - count);
+                        bucket.set(finalAvailable - count, 1, TimeUnit.HOURS);
                     }
                 }
             );
